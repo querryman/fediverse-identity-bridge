@@ -3,3 +3,12 @@ node_modules/
 keys/
 registry/
 coverage/
+
+# Experiment and benchmark outputs
+/results/
+/experiments/results/
+bench_chain_depth_results.csv
+experiments/bench_chain_depth_results.csv
+bench_chain_depth.csv
+bridge_output.txt
+bridge_error.txt
