@@ -1,0 +1,58 @@
+[
+  {
+    "concurrency": 1,
+    "avgLatency": 8,
+    "p95": 105,
+    "p99": 128,
+    "failures": 0,
+    "maxBridgeRam": 49
+  },
+  {
+    "concurrency": 2,
+    "avgLatency": 8,
+    "p95": 105,
+    "p99": 111,
+    "failures": 0,
+    "maxBridgeRam": 49
+  },
+  {
+    "concurrency": 5,
+    "avgLatency": 17,
+    "p95": 117,
+    "p99": 119,
+    "failures": 0,
+    "maxBridgeRam": 49
+  },
+  {
+    "concurrency": 10,
+    "avgLatency": 32,
+    "p95": 123,
+    "p99": 127,
+    "failures": 0,
+    "maxBridgeRam": 49
+  },
+  {
+    "concurrency": 20,
+    "avgLatency": 69,
+    "p95": 156,
+    "p99": 274,
+    "failures": 0,
+    "maxBridgeRam": 46
+  },
+  {
+    "concurrency": 40,
+    "avgLatency": 101,
+    "p95": 174,
+    "p99": 175,
+    "failures": 0,
+    "maxBridgeRam": 45
+  },
+  {
+    "concurrency": 80,
+    "avgLatency": 132,
+    "p95": 187,
+    "p99": 287,
+    "failures": 0,
+    "maxBridgeRam": 45
+  }
+]

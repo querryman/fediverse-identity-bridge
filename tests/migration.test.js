@@ -1,0 +1,178 @@
+﻿// tests/migration.test.js
+const { expect } = require('chai');
+const fetch = require('node-fetch');
+const { makeApp } = require('../server');
+const bridgeModule = require('../bridge');
+const storage = require('../lib/storage');
+const { generateKeypair, signString } = require('../lib/crypto');
+const { getDidFromPublicPem } = require('../lib/did');
+const { createMigrationVC } = require('../lib/vc');
+const metrics = require('../metrics_logger');
+const fs = require('fs');
+
+const { listen: bridgeListen } = bridgeModule;
+
+const { computeDigest, buildSigningString } = (() => {
+  function computeDigest(bodyObj) {
+    const s = JSON.stringify(bodyObj);
+    const hash = require('crypto').createHash('sha256').update(s, 'utf8').digest('base64');
+    return `SHA-256=${hash}`;
+  }
+  function buildSigningString(method, path, host, date, digest) {
+    return `(request-target): ${method.toLowerCase()} ${path}\nhost: ${host}\ndate: ${date}\ndigest: ${digest}`;
+  }
+  return { computeDigest, buildSigningString };
+})();
+
+let aliceServer, bobServer, bridgeServer;
+let alicePort, bobPort, bridgePort;
+
+before(async function () {
+  this.timeout(10000);
+
+  const aliceApp = makeApp({ DOMAIN: 'localhost:0', USERS: 'alice' });
+  aliceServer = await new Promise(r => { const s = aliceApp.listen(0, () => r(s)); });
+  alicePort = aliceServer.address().port;
+  aliceApp.locals.DOMAIN = localhost: ;
+
+  const bobApp = makeApp({ DOMAIN: 'localhost:0', USERS: 'bob' });
+  bobServer = await new Promise(r => { const s = bobApp.listen(0, () => r(s)); });
+  bobPort = bobServer.address().port;
+
+  bridgeServer = await bridgeListen(4000);
+  bridgePort = bridgeServer.address().port;
+
+  await new Promise(r => setTimeout(r, 400));
+});
+
+after(async function () {
+  if (aliceServer) aliceServer.close();
+  if (bobServer) bobServer.close();
+  if (bridgeServer) bridgeServer.close();
+});
+
+it('issues and verifies migration credential', async function () {
+  this.timeout(10000);
+  const pub = fs.readFileSync('./keys/alice/ed25519_public.pem', 'utf8');
+  const priv = fs.readFileSync('./keys/alice/ed25519_private.pem', 'utf8');
+
+  const aliceDid = getDidFromPublicPem(pub);
+  await storage.putDid(aliceDid, pub);
+
+  const vc = createMigrationVC({
+    issuerDid: aliceDid,
+    subjectDid: aliceDid,
+    oldActor: http://localhost:/actor/alice,
+    newActor: http://localhost:/actor/bob,
+    issuerPrivatePem: priv
+  });
+
+  const start = Date.now();
+  const res = await fetch(http://localhost:/verify, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ vc })
+  });
+const json = await res.json();
+const latency = Date.now() - start;
+metrics.log('verify-vc', json.valid === true, latency);
+
+expect(json.valid).to.equal(true);
+console.log('migration credential verified successfully');
+});
+
+it('accepts inbox POST with valid HTTP signature', async function () {
+  this.timeout(10000);
+  const activity = {
+    '@context': 'https://www.w3.org/ns/activitystreams',
+    id: 'test-follow',
+    type: 'Follow',
+    actor: http://localhost:/actor/alice,
+    object: http://localhost:/actor/bob
+  };
+
+  const priv = fs.readFileSync('./keys/alice/ed25519_private.pem', 'utf8');
+
+  const date = new Date().toUTCString();
+  const digest = computeDigest(activity);
+  const signingString = buildSigningString('post', '/actor/bob/inbox', localhost:, date, digest);
+  const signature = signString(priv, signingString);
+  const sigHeader = keyId = "http://localhost:/actor/alice#ed25519", algorithm = "ed25519-sha512", headers = "(request-target) host date digest", signature = "";
+
+  const resp = await fetch(http://localhost:/actor/bob/inbox, {
+    method: 'POST',
+    headers: {
+    'Content-Type': 'application/activity+json',
+    Host: localhost:,
+    Date: date,
+    Digest: digest,
+    Signature: sigHeader
+  },
+    body: JSON.stringify(activity)
+  });
+
+metrics.log('inbox-valid-signature', resp.status === 200, 0);
+expect(resp.status).to.equal(200);
+});
+
+it('rejects inbox POST with missing HTTP signature', async function () {
+  this.timeout(10000);
+  const activity = {
+    '@context': 'https://www.w3.org/ns/activitystreams',
+    id: 'test-follow2',
+    type: 'Follow',
+    actor: http://localhost:/actor/alice,
+    object: http://localhost:/actor/bob
+  };
+
+  const resp = await fetch(http://localhost:/actor/bob/inbox, {
+    method: 'POST',
+    headers: {
+    'Content-Type': 'application/activity+json',
+    Host: localhost:,
+    Date: new Date().toUTCString(),
+    Digest: computeDigest(activity)
+  },
+    body: JSON.stringify(activity)
+  });
+
+const json = await resp.json();
+metrics.log('inbox-missing-signature', json.ok === false, 0);
+expect(json.ok).to.equal(false);
+});
+
+it('rejects inbox POST with invalid HTTP signature', async function () {
+  this.timeout(10000);
+  const activity = {
+    '@context': 'https://www.w3.org/ns/activitystreams',
+    id: 'test-follow3',
+    type: 'Follow',
+    actor: http://localhost:/actor/alice,
+    object: http://localhost:/actor/bob
+  };
+
+  const priv = fs.readFileSync('./keys/alice/ed25519_private.pem', 'utf8');
+
+  const date = new Date().toUTCString();
+  const digest = computeDigest(activity);
+  const signingString = buildSigningString('post', '/actor/bob/inbox', localhost:, date, digest);
+  let signature = signString(priv, signingString);
+  signature = signature.slice(0, -4) + 'abcd';
+  const sigHeader = keyId = "http://localhost:/actor/alice#ed25519", algorithm = "ed25519-sha512", headers = "(request-target) host date digest", signature = "";
+
+  const resp = await fetch(http://localhost:/actor/bob/inbox, {
+    method: 'POST',
+    headers: {
+    'Content-Type': 'application/activity+json',
+    Host: localhost:,
+    Date: date,
+    Digest: digest,
+    Signature: sigHeader
+  },
+    body: JSON.stringify(activity)
+  });
+
+const json = await resp.json();
+metrics.log('inbox-invalid-signature', json.ok === false, 0);
+expect(json.ok).to.equal(false);
+});

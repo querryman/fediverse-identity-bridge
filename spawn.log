@@ -1,0 +1,5 @@
+=== New Run ===
+[NODE-A] Sent follow to bob
+[NODE-A] Bridge DID resolve response status 200
+[NODE-A] Migration VC issued, id= http://localhost:3000/actor/alice/credentials/migration/1763572115744
+[NODE-A] Migration credential verified successfully

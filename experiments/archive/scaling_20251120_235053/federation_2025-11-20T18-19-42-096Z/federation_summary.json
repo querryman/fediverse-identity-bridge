@@ -1,0 +1,7 @@
+{
+  "requests": 200,
+  "avg_latency_ms": "4.54",
+  "p95_latency_ms": 4,
+  "p99_latency_ms": 96,
+  "max_bridge_ram_mb": 66
+}

@@ -1,0 +1,8 @@
+{
+  "requests": 1000,
+  "concurrency": 20,
+  "avg_latency_ms": 483.83,
+  "p95_latency_ms": 611,
+  "p99_latency_ms": 625,
+  "max_bridge_ram_mb": 51
+}

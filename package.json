@@ -1,0 +1,38 @@
+{
+  "name": "fediverse-identity-bridge",
+  "version": "1.0.0",
+  "description": "A small bridge for mapping identity across fediverse nodes (skeleton)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:spawn": "node spawn_nodes.js",
+    "bridge": "node bridge.js",
+    "test": "mocha \"tests/**/*.js\" --timeout 10000"
+  },
+  "keywords": [
+    "fediverse",
+    "identity",
+    "bridge"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@noble/ed25519": "^3.0.0",
+    "body-parser": "^1.20.2",
+    "bs58": "^5.0.0",
+    "chart.js": "^4.5.1",
+    "chartjs-node-canvas": "^5.0.0",
+    "cross-env": "^7.0.3",
+    "express": "^4.18.2",
+    "multibase": "^4.0.6",
+    "multicodec": "^3.2.1",
+    "node-fetch": "^2.6.7",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "chai": "^4.3.8",
+    "mocha": "^10.2.0",
+    "nodemon": "^2.0.22",
+    "supertest": "^6.3.3"
+  }
+}

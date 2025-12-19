@@ -1,0 +1,38 @@
+[KEYS] Loaded keys for carol
+node:events:491
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::3002
+    at Server.setupListenHandle [as _listen2] (node:net:1740:16)
+    at listenInCluster (node:net:1788:12)
+    at Server.listen (node:net:1876:7)
+    at Function.listen (C:\workspace\fediverse-identity-bridge\node_modules\express\lib\application.js:635:24)
+    at listen (C:\workspace\fediverse-identity-bridge\server.js:216:14)
+    at Object.<anonymous> (C:\workspace\fediverse-identity-bridge\server.js:221:3)
+    at Module._compile (node:internal/modules/cjs/loader:1254:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1308:10)
+    at Module.load (node:internal/modules/cjs/loader:1117:32)
+    at Module._load (node:internal/modules/cjs/loader:958:12)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1767:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3002
+}
+
+Node.js v18.16.0
+Error [ERR_CRYPTO_SIGN_KEY_REQUIRED]: No key provided to sign
+    at new NodeError (node:internal/errors:399:5)
+    at Object.signOneShot [as sign] (node:internal/crypto/sig:151:11)
+    at signString (C:\workspace\fediverse-identity-bridge\lib\crypto.js:20:17)
+    at createMigrationVC (C:\workspace\fediverse-identity-bridge\lib\vc.js:62:15)
+    at C:\workspace\fediverse-identity-bridge\server.js:199:20
+    at Layer.handle [as handle_request] (C:\workspace\fediverse-identity-bridge\node_modules\express\lib\router\layer.js:95:5)
+    at next (C:\workspace\fediverse-identity-bridge\node_modules\express\lib\router\route.js:149:13)
+    at Route.dispatch (C:\workspace\fediverse-identity-bridge\node_modules\express\lib\router\route.js:119:3)
+    at Layer.handle [as handle_request] (C:\workspace\fediverse-identity-bridge\node_modules\express\lib\router\layer.js:95:5)
+    at C:\workspace\fediverse-identity-bridge\node_modules\express\lib\router\index.js:284:15

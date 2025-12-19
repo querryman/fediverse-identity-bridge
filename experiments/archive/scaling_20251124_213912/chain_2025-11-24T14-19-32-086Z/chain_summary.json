@@ -1,0 +1,11 @@
+{
+  "depths": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32
+  ],
+  "note": "Higher depths simulate long-lived identity migrations"
+}

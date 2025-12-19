@@ -1,0 +1,6 @@
+depth,latency_ms,valid
+1,44,true
+2,23,true
+4,24,true
+8,22,true
+16,26,true
