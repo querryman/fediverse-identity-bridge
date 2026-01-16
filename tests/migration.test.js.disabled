@@ -33,7 +33,7 @@ before(async function () {
   const aliceApp = makeApp({ DOMAIN: 'localhost:0', USERS: 'alice' });
   aliceServer = await new Promise(r => { const s = aliceApp.listen(0, () => r(s)); });
   alicePort = aliceServer.address().port;
-  aliceApp.locals.DOMAIN = localhost: ;
+  aliceApp.locals.DOMAIN = `localhost:${alicePort}`;
 
   const bobApp = makeApp({ DOMAIN: 'localhost:0', USERS: 'bob' });
   bobServer = await new Promise(r => { const s = bobApp.listen(0, () => r(s)); });
@@ -62,13 +62,13 @@ it('issues and verifies migration credential', async function () {
   const vc = createMigrationVC({
     issuerDid: aliceDid,
     subjectDid: aliceDid,
-    oldActor: http://localhost:/actor/alice,
-    newActor: http://localhost:/actor/bob,
+    oldActor: 'http://localhost:' + alicePort + '/actor/alice',
+    newActor: 'http://localhost:' + bobPort + '/actor/bob',
     issuerPrivatePem: priv
   });
 
   const start = Date.now();
-  const res = await fetch(http://localhost:/verify, {
+  const res = await fetch('http://localhost:4000/verify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ vc })

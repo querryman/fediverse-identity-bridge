@@ -12,3 +12,11 @@ experiments/bench_chain_depth_results.csv
 bench_chain_depth.csv
 bridge_output.txt
 bridge_error.txt
+# Status and task references reports
+WEEK_*_SUMMARY.md
+WEEK_*_REPORT.md
+WEEK_*_VERIFICATION_REPORT.md
+*_COMPLETION_REPORT.md
+*_STATUS_REPORT.md
+TASK_*_REPORT.md
+VERIFICATION_REPORT.md

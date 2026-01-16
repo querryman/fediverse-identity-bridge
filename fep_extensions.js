@@ -1,8 +1,8 @@
 // fep_extensions.js — Ed25519-compatible HTTP Signature helpers
 // Uses crypto.js (async Ed25519) and did.js
 
-const { signString, verifyString } = require("./crypto");
-const { resolveDid } = require("./did");
+const { signString, verifyString } = require("./lib/crypto");
+const { resolveDid } = require("./lib/did");
 
 /**
  * Build an HTTP Signature header (FEP-521 style)

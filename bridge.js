@@ -5,60 +5,30 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const fetch = require("node-fetch");
 
-const storage = require("./lib/storage");
-const { verifyMigrationVC, createMigrationVC } = require("./lib/vc");
+// Use Redis storage if configured, otherwise fall back to file-based storage
+const storage = process.env.REDIS_HOST
+  ? require("./lib/storage-redis")
+  : require("./lib/storage");
+
+const { verifyMigrationVC, createMigrationVC, createMigrationVCUnsigned } = require("./lib/vc");
 const { resolveLineage, resolveLineageByDid } = require("./lib/lineage");
 const { getBase64FromDid } = require("./lib/did");
-
-// ------------------------------------------------------------
-// Simple in-memory caches
-// ------------------------------------------------------------
-const VC_CACHE = new Map();        // vc.id → validated terminal VC
-const REMOTE_CACHE = new Map();    // url → VC JSON
-const STATUS_CACHE = new Map();    // url → status JSON
-
-const MAX_AGE = 5000;
-
-// ------------------------------------------------------------
-function getCached(map, key) {
-  const e = map.get(key);
-  if (!e) return null;
-  if (Date.now() - e.t > MAX_AGE) return null;
-  return e.v;
-}
-function putCached(map, key, value) {
-  map.set(key, { v: value, t: Date.now() });
-}
+const vcResolution = require("./lib/vc-resolution");
 
 // ------------------------------------------------------------
 // FETCH HELPERS (no http-signature enforcement)
 // ------------------------------------------------------------
 
-async function fetchJSONWithCache(url, cacheMap) {
-  const c = getCached(cacheMap, url);
-  if (c) return c;
-
-  try {
-    const r = await fetch(url);
-    if (!r.ok) return null;
-    const json = await r.json();
-    putCached(cacheMap, url, json);
-    return json;
-  } catch {
-    return null;
-  }
-}
+// FETCH HELPERS (using vcResolution for dual-strategy lookup)
+// ---
 
 async function fetchAuthoritativeVC(actorUrl) {
-  const local = await storage.getVCsByOldActor(actorUrl);
-  if (local.length > 0) {
-    return local[local.length - 1];
-  }
-  return fetchJSONWithCache(actorUrl + "/migration", REMOTE_CACHE);
+  const resolved = await vcResolution.resolveVC(actorUrl);
+  return resolved ? resolved.vc : null;
 }
 
 async function fetchRevocationStatus(actorUrl) {
-  return fetchJSONWithCache(actorUrl + "/migration/status", STATUS_CACHE);
+  return vcResolution.getRevocationStatus(actorUrl);
 }
 
 // ------------------------------------------------------------
@@ -111,24 +81,75 @@ app.post("/link", async (req, res) => {
 // POST /migrate (unchanged)
 // ------------------------------------------------------------
 app.post("/migrate", async (req, res) => {
-  const { issuerDid, subjectDid, oldActor, newActor, issuerPrivatePem } = req.body;
+  const { issuerDid, subjectDid, oldActor, newActor } = req.body;
 
-  if (!issuerDid || !subjectDid || !oldActor || !newActor || !issuerPrivatePem) {
+  if (!issuerDid || !subjectDid || !oldActor || !newActor) {
     return res.status(400).json({
-      error: "issuerDid, subjectDid, oldActor, newActor, issuerPrivatePem required"
+      error: "issuerDid, subjectDid, oldActor, newActor required"
     });
   }
 
-  const vc = createMigrationVC({
-    issuerDid,
-    subjectDid,
-    oldActor,
-    newActor,
-    issuerPrivatePem
-  });
+  try {
+    const vc = await createMigrationVCUnsigned({
+      issuerDid,
+      subjectDid,
+      oldActor,
+      newActor
+    });
 
-  await storage.saveCredential(vc);
-  res.json({ vc });
+    await storage.saveCredential(vc);
+    res.json({ vc });
+  } catch (e) {
+    console.error("/migrate error", e);
+    res.status(500).json({ error: "internal" });
+  }
+});
+
+// POST /store — Accepts signed VC from actor
+app.post("/store", async (req, res) => {
+  const vc = req.body.vc || req.body;
+  
+  if (!vc || !vc.id || !vc.proof) {
+    return res.status(400).json({
+      error: "Signed VC required (must include proof)"
+    });
+  }
+
+  try {
+    const issuerDid = vc.issuer;
+    let publicPem = await storage.getDid(issuerDid);
+    
+    // If issuer not in storage and issuer is a did:key, extract from DID
+    if (!publicPem && issuerDid.startsWith("did:key:z")) {
+      const publicKeyBase64 = getBase64FromDid(issuerDid);
+      if (publicKeyBase64) {
+        publicPem = publicKeyBase64;
+        await storage.putDid(issuerDid, publicKeyBase64);
+      }
+    }
+    
+    if (!publicPem) {
+      return res.status(400).json({
+        error: "Unknown issuer"
+      });
+    }
+
+    // Verify signature
+    const ok = await verifyMigrationVC(vc, publicPem);
+    if (!ok) {
+      return res.status(400).json({
+        error: "Invalid signature"
+      });
+    }
+
+    // Store signed VC
+    await storage.saveCredential(vc);
+
+    res.json({ ok: true, vc });
+  } catch (e) {
+    console.error("/store error", e);
+    res.status(500).json({ error: "internal" });
+  }
 });
 
 // ------------------------------------------------------------
@@ -139,10 +160,6 @@ app.post("/verify", async (req, res) => {
     const vc = req.body.vc || req.body;
     if (!vc) return res.json({ valid: false, reason: "missing_vc" });
 
-    if (VC_CACHE.has(vc.id)) {
-      return res.json({ valid: true, vc: VC_CACHE.get(vc.id) });
-    }
-
     const issuerDid = vc.issuer;
     let publicPem = await storage.getDid(issuerDid);
     
@@ -151,7 +168,7 @@ app.post("/verify", async (req, res) => {
       const publicKeyBase64 = getBase64FromDid(issuerDid);
       if (publicKeyBase64) {
         publicPem = publicKeyBase64;
-        // Cache it for future requests
+        // Cache it for future requests (Redis handles TTL)
         await storage.putDid(issuerDid, publicKeyBase64);
       }
     }
@@ -159,7 +176,7 @@ app.post("/verify", async (req, res) => {
     if (!publicPem)
       return res.json({ valid: false, reason: "unknown_issuer" });
 
-      const ok = await verifyMigrationVC(vc, publicPem);
+    const ok = await verifyMigrationVC(vc, publicPem);
     if (!ok)
       return res.json({ valid: false, reason: "invalid_signature" });
 
@@ -169,7 +186,6 @@ app.post("/verify", async (req, res) => {
 
     const terminal = await followChain(vc);
 
-    VC_CACHE.set(vc.id, terminal);
     await storage.saveCredential(vc);
 
     res.json({ valid: true, vc: terminal });
