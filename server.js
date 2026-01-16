@@ -230,8 +230,10 @@ function listen(port = 3000) {
     });
 
     // --------------------------------------------------------
-    // Inbox — ONLY verifies HTTP signature
+    // Inbox — Verifies HTTP signature + Move validation
     // --------------------------------------------------------
+    const BRIDGE_URL = process.env.BRIDGE_URL || 'http://localhost:4000';
+
     app.post('/actor/:username/inbox', async (req, res) => {
       const user = users[req.params.username];
       if (!user) return res.status(404).json({ error: 'not found' });
@@ -267,7 +269,52 @@ function listen(port = 3000) {
 
       // Process activity
       const activity = req.body;
-      if (activity.type === 'Follow') {
+
+      // Task 1.1: Validate Move activities with bridge
+      if (activity.type === 'Move') {
+        try {
+          const verifyResp = await fetch(`${BRIDGE_URL}/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vc: activity.object }),
+            timeout: 5000
+          });
+
+          if (!verifyResp.ok) {
+            const result = await verifyResp.json();
+            return res.status(403).json({
+              error: 'Migration verification failed',
+              reason: result.reason || 'Invalid credential',
+              details: result.details
+            });
+          }
+
+          const result = await verifyResp.json();
+          if (!result.valid) {
+            return res.status(403).json({
+              error: 'Migration verification failed',
+              reason: result.reason || 'Verification returned false',
+              details: result.details
+            });
+          }
+
+          // Migration verified — proceed with state change
+          user.credentials.push({
+            type: 'Move',
+            vc: activity.object,
+            timestamp: new Date().toISOString(),
+            verified: true
+          });
+
+          console.log(`[${user.username}] Move activity verified and stored`);
+        } catch (e) {
+          console.error(`[${user.username}] Bridge verification error:`, e.message);
+          return res.status(503).json({
+            error: 'Bridge unreachable',
+            details: e.message
+          });
+        }
+      } else if (activity.type === 'Follow') {
         if (!user.followers.includes(activity.actor)) {
           user.followers.push(activity.actor);
         }

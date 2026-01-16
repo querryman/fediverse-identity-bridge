@@ -95,6 +95,60 @@ All incoming ActivityPub messages to `/actor/:username/inbox` are now verified u
 - Keys are auto-generated for each user in `keys/<username>/`.
 - DIDs and credentials are stored in `registry/` as JSON files.
 
+## Environment Variables (Task 1.3 - Deployment Coupling)
+
+The bridge and server support flexible deployment via environment variables:
+
+**Bridge Configuration:**
+- `BRIDGE_PORT` — Port to listen on (default: `4000`)
+- `BRIDGE_NETWORK` — Network interface (default: `127.0.0.1` for sidecar mode)
+  - Set to `0.0.0.0` for public exposure (not recommended)
+- `BRIDGE_URL` — Used by server to locate bridge (default: `http://localhost:4000`)
+- `REDIS_HOST` — Redis hostname (default: `localhost`)
+- `REDIS_PORT` — Redis port (default: `6379`)
+- `REDIS_DB` — Redis database number (default: `0`)
+
+**Server Configuration:**
+- `PORT` — Server listen port (default: `3000`)
+- `DOMAIN` — Public domain (default: `localhost:3000`)
+- `USERS` — Comma-separated list of user names (default: `alice`)
+- `BRIDGE_URL` — Bridge service URL for Move verification (default: `http://localhost:4000`)
+
+**Deployment Patterns:**
+
+1. **Local Development (default)**
+   ```bash
+   # Terminal 1: Start Redis
+   redis-server
+   
+   # Terminal 2: Start bridge
+   node bridge.js
+   
+   # Terminal 3: Start server
+   node server.js
+   ```
+
+2. **Docker Sidecar (Recommended)**
+   ```bash
+   # Bridge runs internally (127.0.0.1:4000)
+   export BRIDGE_NETWORK=127.0.0.1
+   export BRIDGE_URL=http://localhost:4000
+   
+   # Server connects to bridge via localhost
+   node server.js
+   node bridge.js
+   ```
+
+3. **Multi-Instance Federation (Advanced)**
+   ```bash
+   # Set explicit BRIDGE_URL for remote bridge
+   export BRIDGE_URL=http://bridge.internal:4000
+   export BRIDGE_NETWORK=0.0.0.0  # Accept all interfaces
+   
+   node bridge.js
+   node server.js
+   ```
+
 ## Testing
 
 Run `npm test` to verify:
@@ -102,12 +156,14 @@ Run `npm test` to verify:
 - Inbox HTTP signature acceptance (valid signature)
 - Inbox HTTP signature rejection (missing/invalid signature)
 - Metrics are logged to `metrics.csv`
+- Move activity validation with bridge
 
 ## Demo Output
 
 When running `node spawn_nodes.js`, you should see logs including:
 - "Migration credential verified successfully"
 - Inbox acceptance/rejection based on signature validity
+- "[username] Move activity verified and stored" (Task 1.1)
 
 Files of interest
 

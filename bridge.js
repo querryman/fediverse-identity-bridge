@@ -238,12 +238,16 @@ app.post("/register", async (req, res) => {
 
 // ------------------------------------------------------------
 // Startup
+// Task 1.2: Localhost-only binding (sidecar mode)
 // ------------------------------------------------------------
 function listen(port = process.env.BRIDGE_PORT || 4000) {
+  // Bind to localhost only (127.0.0.1) for sidecar mode
+  const host = process.env.BRIDGE_NETWORK || '127.0.0.1';
+  
   return new Promise(resolve => {
     const srv = app
-      .listen(port, () => {
-        console.log("Bridge listening on", port);
+      .listen(port, host, () => {
+        console.log(`Bridge listening on ${host}:${port} (sidecar mode)`);
         resolve(srv);
       })
       .on("error", err => {
