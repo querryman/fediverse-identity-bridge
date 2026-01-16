@@ -57,29 +57,10 @@ async function followChain(vc) {
 const app = express();
 app.use(bodyParser.json());
 
-// ------------------------------------------------------------
-// POST /link (unchanged)
-// ------------------------------------------------------------
-app.post("/link", async (req, res) => {
-  const { oldDid, newDid } = req.body;
-  if (!oldDid || !newDid)
-    return res.status(400).json({ error: "oldDid and newDid required" });
+// POST /migrate endpoint
 
-  const mapping = {
-    id: `link:${oldDid}:${newDid}`,
-    type: "Link",
-    oldDid,
-    newDid,
-    created: new Date().toISOString()
-  };
-
-  await storage.saveCredential(mapping);
-  res.json({ ok: true, mapping });
-});
-
-// ------------------------------------------------------------
-// POST /migrate (unchanged)
-// ------------------------------------------------------------
+// POST /migrate - Returns unsigned VC template for client signing
+---
 app.post("/migrate", async (req, res) => {
   const { issuerDid, subjectDid, oldActor, newActor } = req.body;
 
