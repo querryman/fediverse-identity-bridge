@@ -1,6 +1,12 @@
 version: '3.8'
 
+# Task 8.1: Docker Configuration for Fediverse Identity Bridge
+# Usage: docker-compose up
+# For bridge only: docker-compose up redis bridge
+# For full stack: docker-compose up
+
 services:
+  # Redis backend for persistent VC/DID storage
   redis:
     image: redis:7-alpine
     container_name: fediverse-bridge-redis
@@ -14,7 +20,59 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    networks:
+      - bridge-network
+
+  # Identity Bridge microservice (sidecar mode)
+  bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fediverse-bridge
+    ports:
+      - "4000:4000"
+    environment:
+      BRIDGE_NETWORK: 0.0.0.0      # Accept all interfaces in container
+      BRIDGE_PORT: 4000
+      REDIS_HOST: redis            # Use service name for internal DNS
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_NAMESPACE: identity_bridge
+      NODE_ENV: production
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - bridge-network
+    restart: unless-stopped
+
+  # ActivityPub Server (optional - for testing/demo)
+  # Uncomment to run alongside bridge in single docker-compose
+  # server:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: fediverse-server
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     PORT: 3000
+  #     DOMAIN: localhost:3000
+  #     BRIDGE_URL: http://bridge:4000  # Use service name for internal DNS
+  #     USERS: alice,bob,carol
+  #     NODE_ENV: production
+  #   depends_on:
+  #     bridge:
+  #       condition: service_healthy
+  #   networks:
+  #     - bridge-network
+  #   restart: unless-stopped
+  #   command: node server.js
 
 volumes:
   redis-data:
     driver: local
+
+networks:
+  bridge-network:
+    driver: bridge

@@ -453,3 +453,8 @@ describe('Chain Depth Verification - Integration', () => {
     assert(result.issues.length > 0, 'issue recorded for missing VC');
   });
 });
+// Cleanup: Force exit after all tests complete
+// (Prevents hanging from Redis connections or bridge servers)
+after(() => {
+  process.exit(0);
+});
