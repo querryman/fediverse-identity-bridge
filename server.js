@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
 
-const { generateKeypair } = require('./lib/crypto');
+const { generateKeypairEd25519: generateKeypair } = require('./lib/crypto');
 const { getDidFromPublicKey } = require('./lib/did');
 const { createMigrationVC } = require('./lib/vc');
 const storage = require('./lib/storage');
@@ -50,8 +50,9 @@ function listen(port = 3000) {
         publicKey = fs.readFileSync(pubPath, 'utf8').trim();
       } else {
         const kp = await generateKeypair();
-        privateKey = kp.privateKeyBase64;
-        publicKey = kp.publicKeyBase64;
+        // generateKeypairEd25519 returns { publicKey, privateKey }
+        privateKey = kp.privateKey;
+        publicKey = kp.publicKey;
 
         fs.writeFileSync(privPath, privateKey, { mode: 0o600 });
         fs.writeFileSync(pubPath, publicKey);
@@ -143,18 +144,28 @@ function listen(port = 3000) {
       const { newActor } = req.body;
       if (!newActor) return res.status(400).json({ error: 'newActor required' });
 
-      const vc = await createMigrationVC({
-        issuerDid: user.did,
-        subjectDid: user.did,
-        oldActor: user.actorUrl,
-        newActor,
-        issuerPrivateKey: user.privateKey
-      });
+      try {
+        console.log(`[${user.username}] /migrate requested -> newActor=${newActor}`);
 
-      user.credentials.push(vc);
-      await storage.saveCredential(vc);
+        const vc = await createMigrationVC({
+          issuerDid: user.did,
+          subjectDid: user.did,
+          oldActor: user.actorUrl,
+          newActor,
+          issuerPrivateKey: user.privateKey
+        });
 
-      res.json({ vc });
+        user.credentials.push(vc);
+
+        await storage.saveCredential(vc);
+
+        console.log(`[${user.username}] Migration VC created: ${vc.id}`);
+        res.json({ vc });
+      } catch (e) {
+        console.error(`[${user.username}] /migrate error:`, e && e.stack ? e.stack : e);
+        // Return safe error message to caller
+        res.status(500).json({ error: 'internal', details: String(e && e.message ? e.message : e) });
+      }
     });
 
     // --------------------------------------------------------

@@ -57,10 +57,10 @@ async function followChain(vc) {
 const app = express();
 app.use(bodyParser.json());
 
-// POST /migrate endpoint
+// Health endpoint for simple readiness checks
+app.get('/', (req, res) => res.json({ ok: true }));
 
 // POST /migrate - Returns unsigned VC template for client signing
----
 app.post("/migrate", async (req, res) => {
   const { issuerDid, subjectDid, oldActor, newActor } = req.body;
 

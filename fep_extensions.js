@@ -1,8 +1,8 @@
 // fep_extensions.js — Ed25519-compatible HTTP Signature helpers
 // Uses crypto.js (async Ed25519) and did.js
 
-const { signString, verifyString } = require("./lib/crypto");
-const { resolveDid } = require("./lib/did");
+const { signEd25519, verifyEd25519 } = require("./lib/crypto");
+const { getBase64FromDid } = require("./lib/did");
 
 /**
  * Build an HTTP Signature header (FEP-521 style)
@@ -15,7 +15,7 @@ async function createHttpSignature(privateKeyBase64, method, path, host, date, d
     `date: ${date}\n` +
     `digest: ${digest}`;
 
-  const signature = await signString(privateKeyBase64, signingString);
+  const signature = await signEd25519(privateKeyBase64, signingString);
 
   return (
     `keyId="${keyId}",` +
@@ -44,7 +44,7 @@ async function verifyHttpSignature(publicKeyBase64, method, path, host, date, di
     `digest: ${digest}`;
 
   try {
-    return await verifyString(publicKeyBase64, signingString, signature);
+    return await verifyEd25519(publicKeyBase64, signingString, signature);
   } catch {
     return false;
   }
@@ -54,7 +54,8 @@ async function verifyHttpSignature(publicKeyBase64, method, path, host, date, di
  * Resolve a DID to Ed25519 public key (base64).
  */
 async function resolveDidDocument(did) {
-  const publicKey = await resolveDid(did);
+  // Try to extract raw key from did:key locally
+  const publicKey = getBase64FromDid(did);
   if (!publicKey) return null;
 
   return {

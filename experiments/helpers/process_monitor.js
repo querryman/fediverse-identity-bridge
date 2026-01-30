@@ -91,12 +91,11 @@ function readProcLinux(pid) {
 function readProcWin(pid) {
   const { execSync } = require("child_process");
   try {
-    const output = execSync(
-      `wmic process where ProcessId=${pid} get WorkingSetSize /format:list`,
-      { encoding: "utf8" }
-    );
-    const match = output.match(/WorkingSetSize=(\d+)/);
-    const ramBytes = match ? parseInt(match[1]) : 0;
+    // Use PowerShell Get-Process to obtain WorkingSet (bytes) which is reliable
+    // and avoids deprecated/erroneous WMIC output on some systems.
+    const cmd = `powershell -NoProfile -Command "try { (Get-Process -Id ${pid} -ErrorAction Stop).WorkingSet } catch { exit 1 }"`;
+    const output = execSync(cmd, { encoding: "utf8" }).trim();
+    const ramBytes = parseInt(output) || 0;
     const ramMB = Math.round(ramBytes / 1024 / 1024);
     return { cpu: 0, ram: ramMB };
   } catch {

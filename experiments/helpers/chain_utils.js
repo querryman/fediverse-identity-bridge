@@ -13,14 +13,14 @@
 
 const crypto = require("crypto");
 const fetch = require("node-fetch");
-const { generateKeypair } = require("../../lib/crypto");
-const { getDidFromPublicPem } = require("../../lib/did");
+const { generateKeypairEd25519 } = require("../../lib/crypto");
+const { getDidFromPublicKey } = require("../../lib/did");
 const { createMigrationVC } = require("../../lib/vc");
 const storage = require("../../lib/storage");
 
 // Create a VC using the shared library helper
-function createVC({ issuerDid, subjectDid, oldActor, newActor, privatePem }) {
-  return createMigrationVC({
+async function createVC({ issuerDid, subjectDid, oldActor, newActor, privatePem }) {
+  return await createMigrationVC({
     issuerDid,
     subjectDid,
     oldActor,
@@ -52,8 +52,8 @@ async function generateMultiHopChain(depth) {
   // Create actors A0..AN
   for (let i = 0; i <= depth; i++) {
     const actor = `http://example.org/actor/${crypto.randomUUID()}`;
-    const pair = generateKeypair();
-    const did = getDidFromPublicPem(pair.publicKey);
+    const pair = await generateKeypairEd25519();
+    const did = await getDidFromPublicKey(pair.publicKey);
 
     actors.push(actor);
     keys.push(pair.privateKey);
@@ -67,7 +67,7 @@ async function generateMultiHopChain(depth) {
 
   // Build and store VCs: A0→A1, A1→A2, ..., A{N-1}→AN
   for (let i = 0; i < depth; i++) {
-    const vc = createVC({
+    const vc = await createVC({
       issuerDid: dids[i],
       subjectDid: dids[i + 1],
       oldActor: actors[i],
@@ -80,9 +80,7 @@ async function generateMultiHopChain(depth) {
     await storeVCInBridge(vc);
   }
 
-  // CRITICAL: Flush writes to disk before returning
-  // This ensures spawned bridge processes can load the registry
-  storage.flushSync();
+  // Writes are synchronous via storage.saveCredential; nothing else required
 
   return firstVC;
 }

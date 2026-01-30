@@ -32,7 +32,7 @@ function sleep(ms) {
 async function detectBridgePort() {
   for (let port = 4000; port <= 4010; port++) {
     try {
-      const res = await fetch(`http://localhost:${port}/resolve/test`, { timeout: 500 });
+      const res = await fetch(`http://127.0.0.1:${port}/resolve/test`, { timeout: 500 });
       // Any response means bridge is listening
       console.log(`  Bridge detected on port ${port}`);
       return port;
@@ -47,13 +47,25 @@ async function detectBridgePort() {
  * Start bridge.js as a child and return its detected port
  * ---------------------------------------------------------------*/
 async function startBridgeAndDetectPort() {
+  // If a bridge is already listening on 4000-4010, use it instead of spawning
+  try {
+    const existingPort = await detectBridgePort();
+    console.log(`  Detected existing bridge on port ${existingPort}, reusing it.`);
+    return { bridge: null, port: existingPort };
+  } catch {
+    // no existing bridge found; proceed to spawn one
+  }
+
   const bridge = spawn("node", ["bridge.js"], {
     cwd: path.join(__dirname, ".."),
-    stdio: "ignore"
+    stdio: ["ignore", "pipe", "pipe"]
   });
-  
-  // Wait for bridge to start and detect its port
-  for (let i = 0; i < 20; i++) {
+
+  bridge.stdout.on("data", d => console.log("[bridge stdout]", d.toString()));
+  bridge.stderr.on("data", d => console.error("[bridge stderr]", d.toString()));
+
+  // Wait for bridge to start and detect its port (longer timeout)
+  for (let i = 0; i < 40; i++) {
     await sleep(150);
     try {
       const port = await detectBridgePort();
@@ -70,7 +82,7 @@ async function startBridgeAndDetectPort() {
  * -------------------------------------------------------------- */
 async function warmUp(vc) {
   try {
-    const res = await fetch("http://localhost:4000/verify", {
+    const res = await fetch("http://127.0.0.1:4000/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ vc })
@@ -88,7 +100,7 @@ async function registerIssuerDid(issuerDid, publicKeyB64, bridgePort) {
   try {
     const payload = { did: issuerDid, publicKey: publicKeyB64 };
     console.log("  Calling /register with DID:", issuerDid);
-    const res = await fetch(`http://localhost:${bridgePort}/register`, {
+    const res = await fetch(`http://127.0.0.1:${bridgePort}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -150,9 +162,12 @@ async function main() {
     // 1. Start bridge and detect its port
     console.log("Starting bridge...");
     const { bridge, port: bridgePort } = await startBridgeAndDetectPort();
-    global.bridgePid = bridge.pid;
-
-    console.log("Bridge PID:", global.bridgePid);
+    if (bridge && bridge.pid) {
+      global.bridgePid = bridge.pid;
+      console.log("Bridge PID:", global.bridgePid);
+    } else {
+      console.log("Using existing bridge process (no child PID)");
+    }
     console.log("Bridge port:", bridgePort);
 
     // 2. Prepare synthetic VC
@@ -169,7 +184,7 @@ async function main() {
     // 4. Warm-up with correct bridge port
     console.log("Performing warm-up request...");
     try {
-      const res = await fetch(`http://localhost:${bridgePort}/verify`, {
+      const res = await fetch(`http://127.0.0.1:${bridgePort}/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ vc })
